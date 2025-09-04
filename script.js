@@ -1,4 +1,4 @@
- const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreDisplay = document.getElementById("scoreDisplay");
 const restartBtn = document.getElementById("restartBtn");
@@ -17,6 +17,8 @@ let normalSpeed = fish.speed;
 let tailSwingAngle = 0;
 const tailSwingSpeed = 0.15;
 
+let isTouching = false;
+
 // Spawn functions
 function spawnFood() {
   food.push({ x: Math.random() * (canvas.width - 20) + 10, y: -20 });
@@ -28,7 +30,7 @@ function spawnSpeedPowerUp() {
   powerUps.push({ x: Math.random() * (canvas.width - 20) + 10, y: -20, size: 12 });
 }
 
-// Controls
+// Keyboard controls
 document.addEventListener("keydown", e => {
   if (!gameActive) return;
   if (e.key === "ArrowUp") { dx = 0; dy = -fish.speed; }
@@ -55,6 +57,38 @@ function resetGame() {
   requestAnimationFrame(gameLoop);
 }
 
+// Touch controls for mobile
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  isTouching = true;
+  moveFishTouch(e.touches[0].clientX, e.touches[0].clientY);
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (isTouching) {
+    moveFishTouch(e.touches[0].clientX, e.touches[0].clientY);
+  }
+});
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  isTouching = false;
+});
+
+function moveFishTouch(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+  const ease = 0.15;
+  fish.x += (x - fish.x) * ease;
+  fish.y += (y - fish.y) * ease;
+  fish.x = Math.max(fish.size, Math.min(canvas.width - fish.size, fish.x));
+  fish.y = Math.max(fish.size, Math.min(canvas.height - fish.size, fish.y));
+  dx = 0;
+  dy = 0;
+}
+
 // Draw bubbles background
 function drawBubbles() {
   if (bubbles.length < 30) {
@@ -75,20 +109,19 @@ function drawBubbles() {
   });
 }
 
-// Draw glowing fish with animated tail
+// Draw glowing fish with tail animation
 function drawGlowingFishWithTail(f) {
   ctx.save();
   ctx.translate(f.x, f.y);
 
-  // Animate tail swing
   tailSwingAngle += tailSwingSpeed;
   let tailX = -f.size - 10;
   let tailY = Math.sin(tailSwingAngle) * 8;
 
-  // Draw glowing tail
+  // Tail
   ctx.shadowColor = "rgba(255,140,0,0.8)";
   ctx.shadowBlur = 15;
-  ctx.fillStyle = "#ff8c00"; // dark orange tail color
+  ctx.fillStyle = "#ff8c00";
   ctx.beginPath();
   ctx.moveTo(tailX, 0);
   ctx.lineTo(tailX - 20, tailY - 15);
@@ -96,32 +129,33 @@ function drawGlowingFishWithTail(f) {
   ctx.closePath();
   ctx.fill();
 
-  // Draw glow aura layers
-  ctx.shadowColor = "rgba(255, 165, 0, 1)";
+  // Aura glow layers
+  ctx.shadowColor = "rgba(255,165,0,1)";
   ctx.shadowBlur = 30;
   for(let i = 0; i < 3; i++) {
     ctx.beginPath();
-    ctx.arc(0, 0, f.size + 6 + i * 3, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,165,0,${0.15 - i * 0.05})`;
+    ctx.arc(0, 0, f.size + 6 + i*3, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,165,0,${0.15 - i*0.05})`;
     ctx.fill();
   }
-
   ctx.shadowBlur = 0;
+
+  // Body
   ctx.fillStyle = "orange";
   ctx.beginPath();
-  ctx.arc(0, 0, f.size, 0, Math.PI * 2);
+  ctx.arc(0, 0, f.size, 0, Math.PI*2);
   ctx.fill();
 
   // Eye white
   ctx.fillStyle = "white";
   ctx.beginPath();
-  ctx.arc(f.size / 3, -f.size / 3, f.size / 5, 0, Math.PI * 2);
+  ctx.arc(f.size/3, -f.size/3, f.size/5, 0, Math.PI*2);
   ctx.fill();
 
   // Pupil black
   ctx.fillStyle = "black";
   ctx.beginPath();
-  ctx.arc(f.size / 3, -f.size / 3, f.size / 10, 0, Math.PI * 2);
+  ctx.arc(f.size/3, -f.size/3, f.size/10, 0, Math.PI*2);
   ctx.fill();
 
   ctx.restore();
@@ -132,14 +166,14 @@ function drawPowerUps() {
   ctx.fillStyle = "blue";
   powerUps.forEach(p => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
     ctx.fill();
   });
 }
 
-// Update power-ups and check collection
+// Update power-ups
 function updatePowerUps() {
-  powerUps.forEach((p, i) => {
+  powerUps.forEach((p,i) => {
     p.y += 2;
     if (Math.hypot(p.x - fish.x, p.y - fish.y) < fish.size + p.size) {
       activateSpeedBurst();
@@ -150,18 +184,18 @@ function updatePowerUps() {
   });
 }
 
-// Speed burst power-up activation
+// Speed burst power-up logic
 function activateSpeedBurst() {
   if (speedBurstActive) return;
   speedBurstActive = true;
-  fish.speed = normalSpeed * 2;
+  fish.speed = normalSpeed*2;
   setTimeout(() => {
     fish.speed = normalSpeed;
     speedBurstActive = false;
   }, 5000);
 }
 
-// Main update
+// Update game objects
 function update() {
   fish.x += dx;
   fish.y += dy;
@@ -172,7 +206,6 @@ function update() {
 // Draw everything
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   drawBubbles();
   drawGlowingFishWithTail(fish);
   drawPowerUps();
@@ -180,53 +213,48 @@ function draw() {
   ctx.fillStyle = "red";
   food.forEach(f => {
     ctx.beginPath();
-    ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
+    ctx.arc(f.x, f.y, 8, 0, Math.PI*2);
     ctx.fill();
   });
 
   ctx.fillStyle = "brown";
   trash.forEach(t => {
-    ctx.fillRect(t.x, t.y, 15, 15);
+    ctx.fillRect(t.x, t.y , 15, 15);
   });
 }
 
-// Check collisions and update score
+// Check collisions and score update
 function checkCollisions() {
-  food.forEach((f, i) => {
+  food.forEach((f,i) => {
     f.y += 2;
     if (Math.hypot(f.x - fish.x, f.y - fish.y) < fish.size + 8) {
-      score += 10;
-      fish.size += 1;
-      food.splice(i, 1);
+      score +=10;
+      fish.size +=1;
+      food.splice(i,1);
       scoreDisplay.textContent = `Score: ${score}`;
-    } else if (f.y > canvas.height + 10) {
-      food.splice(i, 1);
-    }
+    } else if (f.y > canvas.height+10) food.splice(i,1);
   });
 
-  trash.forEach((t, i) => {
-    t.y += 3;
-    if (Math.hypot(t.x + 7.5 - fish.x, t.y + 7.5 - fish.y) < fish.size + 7.5) {
-      score -= 5;
+  trash.forEach((t,i) => {
+    t.y +=3;
+    if (Math.hypot(t.x+7.5 - fish.x, t.y+7.5 - fish.y) < fish.size + 7.5) {
+      score -=5;
       fish.size = Math.max(10, fish.size - 2);
-      trash.splice(i, 1);
+      trash.splice(i,1);
       scoreDisplay.textContent = `Score: ${score}`;
-    } else if (t.y > canvas.height + 15) {
-      trash.splice(i, 1);
-    }
+    } else if (t.y > canvas.height+15) trash.splice(i,1);
   });
 
   updatePowerUps();
 }
 
-// Game loop
+// Main game loop
 function gameLoop() {
   if (!gameActive) return;
   update();
   checkCollisions();
   draw();
-
-  if (fish.size <= 10 || score < 0) {
+  if (fish.size <=10 || score < 0) {
     gameActive = false;
     restartBtn.style.display = "inline-block";
   } else {
